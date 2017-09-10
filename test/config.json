@@ -235,7 +235,7 @@
 				"make",
 				"php_test"
 			],
-			"Manual": true,
+			"Manual": false,
 			"Shard": 4,
 			"RetryMax": 0,
 				"Tags": []
