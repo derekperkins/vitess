@@ -264,8 +264,10 @@ func newMessageManager(tsv TabletService, vs VStreamer, table *schema.Table, pos
 func buildPostponeQuery(name sqlparser.TableIdent, minBackoff, maxBackoff time.Duration) *sqlparser.ParsedQuery {
 	var args []interface{}
 
-	buf := bytes.NewBufferString("update %v set time_next = ")
-	args = append(args, name)
+	// since messages are immediately postponed upon sending, we need to add exponential backoff on top
+	// of the ackWaitTime, otherwise messages will be resent too quickly.
+	buf := bytes.NewBufferString("update %v set time_next = %a + ")
+	args = append(args, name, ":wait_time")
 
 	// have backoff be +/- 33%, seeded with :time_now to be consistent in multiple usages
 	// whenever this is injected, append (:min_backoff, :time_now)
@@ -847,6 +849,7 @@ func (mm *messageManager) GeneratePostponeQuery(ids []string) (string, map[strin
 
 	bvs := map[string]*querypb.BindVariable{
 		"time_now":    sqltypes.Int64BindVariable(time.Now().UnixNano()),
+		"wait_time":   sqltypes.Int64BindVariable(int64(mm.ackWaitTime)),
 		"min_backoff": sqltypes.Int64BindVariable(int64(mm.minBackoff)),
 		"ids":         idbvs,
 	}
